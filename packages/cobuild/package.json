@@ -20,10 +20,16 @@
   ],
   "dependencies": {
     "@ckb-lumos/base": "0.22.0-next.5",
-    "@ckb-lumos/codec": "0.22.0-next.5"
+    "@ckb-lumos/codec": "0.22.0-next.5",
+    "@types/blake2b": "^2.1.3",
+    "blake2b": "^2.1.3"
   },
   "devDependencies": {
-    "@ckb-lumos/molecule": "0.22.0-next.5"
+    "@ckb-lumos/molecule": "0.22.0-next.5",
+    "@ckb-lumos/debugger": "0.22.0-next.5",
+    "@ckb-lumos/helpers": "0.22.0-next.5",
+    "@ckb-lumos/common-scripts": "0.22.0-next.5",
+    "@ckb-lumos/hd": "0.22.0-next.5"
   },
   "repository": {
     "type": "git",
