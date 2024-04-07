@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion, @typescript-eslint/explicit-module-boundary-types */
 
-import * as omnilock from "./omnilock";
 import { Set } from "immutable";
 import {
   createTransactionFromSkeleton,
