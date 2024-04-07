@@ -17,7 +17,6 @@ import { Config, getConfig } from "@ckb-lumos/config-manager";
 import {
   addCellDep,
   isOmnilockScript,
-  OMNILOCK_SIGNATURE_PLACEHOLDER,
   prepareSigningEntries as _prepareSigningEntries,
 } from "./helper";
 import { FromInfo } from ".";
@@ -36,6 +35,9 @@ import {
 } from "@ckb-lumos/codec/lib/blockchain";
 import { bytify, hexify } from "@ckb-lumos/codec/lib/bytes";
 import * as bitcoin from "./omnilock-bitcoin";
+import * as solana from "./omnilock-solana";
+import { decode as bs58Decode } from "bs58";
+import { ckbHash } from "@ckb-lumos/base/lib/utils";
 
 const { ScriptValue } = values;
 
@@ -43,7 +45,11 @@ export type OmnilockInfo = {
   auth: OmnilockAuth;
 };
 
-export type OmnilockAuth = IdentityCkb | IdentityEthereum | IdentityBitcoin;
+export type OmnilockAuth =
+  | IdentityCkb
+  | IdentityEthereum
+  | IdentityBitcoin
+  | IdentitySolana;
 
 export type IdentityCkb = {
   flag: "SECP256K1_BLAKE160";
@@ -71,6 +77,12 @@ export type IdentityBitcoin = {
   content: string;
 };
 
+export type IdentitySolana = {
+  flag: "SOLANA";
+  // base58 encoded ed25519 public key
+  content: string;
+};
+
 // https://github.com/XuJiandong/omnilock/blob/4e9fdb6ca78637651c8145bb7c5b82b4591332fb/c/ckb_identity.h#L62-L76
 enum IdentityFlagsType {
   IdentityFlagsCkb = 0,
@@ -81,10 +93,17 @@ enum IdentityFlagsType {
   IdentityFlagsDogecoin = 5,
   IdentityCkbMultisig = 6,
   IdentityFlagsEthereumDisplaying = 18,
+  IdentityFlagsSolana = 19,
   IdentityFlagsOwnerLock = 0xfc,
   IdentityFlagsExec = 0xfd,
   IdentityFlagsDl = 0xfe,
 }
+
+const SECP256K1_SIGNATURE_PLACEHOLDER_LENGTH = 65;
+
+const ED25519_SIGNATURE_PLACEHOLDER_LENGTH =
+  64 + // signature length
+  32; // public key length
 
 /**
  * only support ETHEREUM and SECP256K1_BLAKE160 mode currently
@@ -156,6 +175,15 @@ export function createOmnilockScript(
             omnilockArgs
           )
         );
+      case "SOLANA":
+        return bytes.hexify(
+          bytes.concat(
+            [IdentityFlagsType.IdentityFlagsSolana],
+            ckbHash(bs58Decode(omnilockInfo.auth.content)).slice(0, 42),
+            omnilockArgs
+          )
+        );
+
       default:
         throw new Error(`Not supported flag: ${flag}.`);
     }
@@ -345,10 +373,17 @@ export async function setupInputCell(
       );
     }
     let witness: string = txSkeleton.get("witnesses").get(firstIndex)!;
+
+    const placeholderLength =
+      bytes.bytify(inputCell.cellOutput.lock.args)[0] ===
+      IdentityFlagsType.IdentityFlagsSolana
+        ? ED25519_SIGNATURE_PLACEHOLDER_LENGTH
+        : SECP256K1_SIGNATURE_PLACEHOLDER_LENGTH;
+
     const newWitnessArgs: WitnessArgs = {
-      /* 85-byte zeros in hex */
-      lock: OMNILOCK_SIGNATURE_PLACEHOLDER,
+      lock: createWitnessLockPlaceholder(placeholderLength),
     };
+
     witness = bytes.hexify(blockchain.WitnessArgs.pack(newWitnessArgs));
     txSkeleton = txSkeleton.update("witnesses", (witnesses) =>
       witnesses.set(firstIndex, witness)
@@ -356,6 +391,15 @@ export async function setupInputCell(
   }
 
   return txSkeleton;
+}
+
+function createWitnessLockPlaceholder(signatureLength: number) {
+  console.log("signature length", signatureLength);
+  const serializedLength = OmnilockWitnessLock.pack({
+    signature: new Uint8Array(signatureLength),
+  }).byteLength;
+
+  return bytes.hexify(new Uint8Array(serializedLength));
 }
 
 /**
@@ -374,6 +418,7 @@ export function prepareSigningEntries(
 }
 
 export { bitcoin };
+export { solana };
 
 export default {
   prepareSigningEntries,

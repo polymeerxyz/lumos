@@ -272,11 +272,6 @@ export function ensureScript(
 /* 65-byte zeros in hex */
 export const SECP_SIGNATURE_PLACEHOLDER =
   "0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
-/* 85-byte zeros in hex */
-export const OMNILOCK_SIGNATURE_PLACEHOLDER = `0x${"00".repeat(
-  omnilock.OmnilockWitnessLock.pack({ signature: SECP_SIGNATURE_PLACEHOLDER })
-    .byteLength
-)}`;
 
 export default {
   addCellDep,
