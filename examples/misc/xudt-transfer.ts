@@ -13,6 +13,7 @@ import { computeScriptHash } from "@ckb-lumos/lumos/utils";
 
 config.initializeConfig(config.TESTNET);
 
+// https://blog.cryptape.com/enhance-sudts-programmability-with-xudt#heading-conclusion
 const XUDT: ScriptConfig = {
   CODE_HASH: "0x25c29dc317811a6f6f3985a7a9ebc4838bd388d19d0feeecf0bcd60f6c0975bb",
   HASH_TYPE: "type",
@@ -30,18 +31,19 @@ const owner = createScript(config.TESTNET.SCRIPTS.SECP256K1_BLAKE160, hd.key.pri
 const ownerAddress = encodeToAddress(owner);
 const xudt = createScript(XUDT, computeScriptHash(owner));
 
+// call this method to mint xUDT for test purpose first before transferring
+// will mint 10000 xUDT to owner self
 async function mint() {
+  const mintAmount = 10000;
   const mintCell: Cell = {
     cellOutput: { lock: owner, type: xudt, capacity: "0x0" },
-    data: bytes.hexify(Uint128.pack(10000)),
+    data: bytes.hexify(Uint128.pack(mintAmount)),
   };
   const xudtCapacity = minimalCellCapacityCompatible(mintCell).toHexString();
   mintCell.cellOutput.capacity = xudtCapacity;
 
   const txSkeleton = TransactionSkeleton({
-    cellProvider: {
-      collector: (query) => indexer.collector({ type: "empty", ...query }),
-    },
+    cellProvider: { collector: (query) => indexer.collector({ type: "empty", data: "0x", ...query }) },
   }).asMutable();
 
   addCellDep(txSkeleton, createCellDep(XUDT));
@@ -59,9 +61,10 @@ async function mint() {
 
   const signed = sealTransaction(txSkeleton, signatures);
   const txHash = await rpc.sendTransaction(signed);
-  console.log(txHash);
+  console.log(`https://pudge.explorer.nervos.org/transaction/${txHash}`);
 }
 
+// transfer the first collected xUDT cell to Alice
 async function transfer() {
   const alicePrivateKey = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
   const aliceLock = createScript(
@@ -76,7 +79,6 @@ async function transfer() {
 
   for await (const cell of xudtCollector.collect()) {
     transferCell = cell;
-
     // collect only one
     break;
   }
@@ -85,10 +87,12 @@ async function transfer() {
     throw new Error("Owner do not have an xUDT cell yet, please call mint first");
   }
 
+  const transferAmount = Uint128.unpack(bytes.bytify(transferCell.data).slice(0, 16));
+  console.log("Transfer to Alice", transferAmount.toNumber(), "xUDT");
+
+  // mutable txSkeleton, suggest using it without any mutation
   const txSkeleton = TransactionSkeleton({
-    cellProvider: {
-      collector: (query) => indexer.collector({ type: "empty", ...query }),
-    },
+    cellProvider: { collector: (query) => indexer.collector({ type: "empty", data: "0x", ...query }) },
   }).asMutable();
 
   addCellDep(txSkeleton, createCellDep(XUDT));
